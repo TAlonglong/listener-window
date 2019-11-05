@@ -17,7 +17,8 @@ def send_message(topic, info, message_type):
     time.sleep(2)
     msg = Message(topic, message_type, info)
     print("Sending message: %s" % str(msg))
-    pub.send(str(msg))
+    for x in range(10):
+        pub.send(str(msg))
     pub_.stop()
 
 def main():

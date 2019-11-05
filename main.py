@@ -7,9 +7,9 @@ import threading
 from posttroll.listener import ListenerContainer, Listener
 import posttroll
 
-from PySide2.QtWidgets import QApplication
+from PySide2.QtWidgets import QApplication, QSizePolicy
 from PySide2.QtWidgets import (QAction, QAbstractItemView, qApp, QDataWidgetMapper, QHeaderView, QMainWindow, QMessageBox, QWidget, QGroupBox, QTableView, QVBoxLayout)
-from PySide2.QtGui import QKeySequence
+from PySide2.QtGui import QKeySequence, QStandardItemModel, QStandardItem
 from PySide2.QtCore import QStringListModel, QObject, QThread, Signal, Slot
 
 class mainWindow(QMainWindow):
@@ -36,29 +36,32 @@ class mainWindow(QMainWindow):
         self.setWindowTitle("Hello")
         self.centralWidget = QWidget(self)
         self.centralWidget.setObjectName("centralWidget")
+        ###self.centralWidget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        #self.centralWidget.resize(600, 600)
+        #self.centralWidget.setBaseSize(600, 600)
+         #self.groupBox = QGroupBox(self.centralWidget)
+        #self.groupBox.setTitle("GroupBox")
+        #self.groupBox.setObjectName("groupBox")
 
-        self.groupBox = QGroupBox(self.centralWidget)
-        self.groupBox.setTitle("")
-        self.groupBox.setObjectName("groupBox")
+        #self.vboxlayout1 = QVBoxLayout(self.groupBox)
+        #self.vboxlayout1.setSpacing(6)
+        #self.vboxlayout1.setContentsMargins(9, 9, 9, 9)
+        #self.vboxlayout1.setObjectName("vboxlayout1")
 
-        self.vboxlayout1 = QVBoxLayout(self.groupBox)
-        self.vboxlayout1.setSpacing(6)
-        self.vboxlayout1.setContentsMargins(9, 9, 9, 9)
-        self.vboxlayout1.setObjectName("vboxlayout1")
-
-        self.liste = QTableView(self.groupBox)
+        #self.liste = QTableView(self.groupBox)
+        self.liste = QTableView(self.centralWidget)
         self.liste.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.liste.setObjectName("liste")
+        self.liste.resize(800,600)
+        self.liste.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)        #self.vboxlayout1.addWidget(self.liste)
 
-        self.vboxlayout1.addWidget(self.liste)
-
-        self.model = QStringListModel(self.liste)
-        self.content = []
-        self.content.append("første")
-        self.content.append("andre")
-        self.content.append("tredje")
+        #self.model = QStringListModel(self.liste)
+        self.model = QStandardItemModel(0,4)
+        self.model.setHorizontalHeaderLabels(['Subject', 'data'])
+        #self.model.setHorizontalHeader("test")
         
-        self.model.setStringList(self.content)
+        #self.model.setStringList(self.content)
+        self.model.appendRow([QStandardItem("første"),QStandardItem("første1"),QStandardItem("første2")])
 
         # Set the model
         self.liste.setModel(self.model)
@@ -67,9 +70,6 @@ class mainWindow(QMainWindow):
 
         #Need to connect the append_content when new message arrives
         #new_message.triggered.connect(append_content())
-
-    def append_content(self, cont):
-        self.content.append(cont)
 
     def create_menubar(self):
         file_menu = self.menuBar().addMenu(self.tr("&File"))
@@ -90,8 +90,9 @@ class mainWindow(QMainWindow):
     @Slot(object)
     def on_over(self, value):
         print('In slot', value)
-        self.content.append(value.subject)        
-        self.model.setStringList(self.content)
+        #self.content.append(value.subject)        
+        #self.model.setStringList(self.content)
+        self.model.appendRow([QStandardItem(str(value.subject)), QStandardItem(str(value.data))])
 
 def read_from_queue(queue):
     #read from queue
