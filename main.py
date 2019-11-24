@@ -8,8 +8,8 @@ from posttroll.listener import ListenerContainer, Listener
 import posttroll
 
 from PySide2.QtWidgets import QApplication, QSizePolicy
-from PySide2.QtWidgets import (QAction, QAbstractItemView, qApp, QDataWidgetMapper, QHeaderView, QMainWindow, QMessageBox, QWidget, QGroupBox, QTableView, QVBoxLayout)
-from PySide2.QtGui import QKeySequence, QStandardItemModel, QStandardItem
+from PySide2.QtWidgets import (QAction, QAbstractItemView, qApp, QDataWidgetMapper, QHeaderView, QMainWindow, QMessageBox, QWidget, QGroupBox, QTableView, QVBoxLayout, QMenu, QAction)
+from PySide2.QtGui import QKeySequence, QStandardItemModel, QStandardItem, QColor, QCursor
 from PySide2.QtCore import QStringListModel, QObject, QThread, Signal, Slot
 
 class mainWindow(QMainWindow):
@@ -20,62 +20,42 @@ class mainWindow(QMainWindow):
 
         self._queue = Queue()
         config = {'subscribe-topic': '/'}
-        listener = FileListener(self._queue, config, "command")
-        listener.start()
+        self.listener = FileListener(self._queue, config, "command")
+        self.listener.start()
 
         #self.thread = QThread(self)
         config_item = 'section on old config stash'
         self.message_handler = MessageHandler(config, config_item, self._queue)
-        #self.message_handler.moveToThread(self.thread)
         self.message_handler.over.connect(self.on_over)
         self.message_handler.start()
-
-        
-        #self.message_handler.start()
 
         self.setWindowTitle("Hello")
         self.centralWidget = QWidget(self)
         self.centralWidget.setObjectName("centralWidget")
-        ###self.centralWidget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        #self.centralWidget.resize(600, 600)
-        #self.centralWidget.setBaseSize(600, 600)
-         #self.groupBox = QGroupBox(self.centralWidget)
-        #self.groupBox.setTitle("GroupBox")
-        #self.groupBox.setObjectName("groupBox")
 
-        #self.vboxlayout1 = QVBoxLayout(self.groupBox)
-        #self.vboxlayout1.setSpacing(6)
-        #self.vboxlayout1.setContentsMargins(9, 9, 9, 9)
-        #self.vboxlayout1.setObjectName("vboxlayout1")
-
-        #self.liste = QTableView(self.groupBox)
         self.liste = QTableView(self.centralWidget)
         self.liste.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.liste.setObjectName("liste")
-        self.liste.resize(800,600)
-        self.liste.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)        #self.vboxlayout1.addWidget(self.liste)
+        self.liste.resize(self.centralWidget.size())
+        self.liste.setAlternatingRowColors(True)
 
-        #self.model = QStringListModel(self.liste)
-        self.model = QStandardItemModel(0,4)
-        self.model.setHorizontalHeaderLabels(['Subject', 'data'])
-        #self.model.setHorizontalHeader("test")
+        self.model = QStandardItemModel(0,7)
+        self.model.setHorizontalHeaderLabels(['Subject', 'Type', 'Sender', 'Time', 'Binary', 'Version', 'data'])
         
-        #self.model.setStringList(self.content)
-        self.model.appendRow([QStandardItem("første"),QStandardItem("første1"),QStandardItem("første2")])
-
         # Set the model
         self.liste.setModel(self.model)
 
-        self.setCentralWidget(self.centralWidget)
+        self.liste.setSortingEnabled(True)
 
-        #Need to connect the append_content when new message arrives
-        #new_message.triggered.connect(append_content())
+        self.setCentralWidget(self.centralWidget)
 
     def create_menubar(self):
         file_menu = self.menuBar().addMenu(self.tr("&File"))
         quit_action = file_menu.addAction(self.tr("&Quit"))
+        quit_action.triggered.connect(self.message_handler.receive_quit)
+        quit_action.triggered.connect(self.listener.receive_quit)
         quit_action.triggered.connect(qApp.quit)
-
+        
         help_menu = self.menuBar().addMenu(self.tr("&Help"))
         about_action = help_menu.addAction(self.tr("&About"))
         about_action.setShortcut(QKeySequence.HelpContents)
@@ -83,31 +63,53 @@ class mainWindow(QMainWindow):
         aboutQt_action = help_menu.addAction("&About Qt")
         aboutQt_action.triggered.connect(qApp.aboutQt)
 
+        
+        #print(QColor.colorNames())
+
     def about(self):
         QMessageBox.about(self, self.tr("About Books"),
             self.tr("<p>main window with more"))
 
     @Slot(object)
     def on_over(self, value):
-        print('In slot', value)
-        #self.content.append(value.subject)        
-        #self.model.setStringList(self.content)
-        self.model.appendRow([QStandardItem(str(value.subject)), QStandardItem(str(value.data))])
+        #print('In slot', value)
+        self.model.appendRow([QStandardItem(str(value.subject)),
+                              QStandardItem(str(value.type)),
+                              QStandardItem(str(value.sender)),
+                              QStandardItem(str(value.time)),
+                              QStandardItem(str(value.binary)),
+                              QStandardItem(str(value.version)),
+                              QStandardItem(str(value.data))])
+        self.liste.resizeColumnsToContents()
+        #self.liste.selectRow(self.model.rowCount() - 1)
+        self.liste.scrollToBottom()
 
-def read_from_queue(queue):
-    #read from queue
-    while True:
-        print("Start waiting for new message in queue qith queue size: {}".format(queue.qsize()))
-        msg = queue.get()
-        print("Got new message. Queue size is now: {}".format(queue.qsize()))
-        _msg = msg['msg']
-        print("Data   : {}".format(_msg.data))
-        print("Subject: {}".format(_msg.subject))
-        print("Type   : {}".format(_msg.type))
-        print("Sender : {}".format(_msg.sender))
-        print("Time   : {}".format(_msg.time))
-        print("Binary : {}".format(_msg.binary))
-        print("Version: {}".format(_msg.version))
+    def resizeEvent(self, re):
+        self.liste.resize(self.centralWidget.size())
+        self.centralWidget.resizeEvent(re)
+
+    def contextMenuEvent(self, event):
+        self.menu = QMenu(self)
+        self.renameAction = QAction('Rename', self)
+        self.renameAction.triggered.connect(self.renameSlot(event))
+        self.menu.addAction(self.renameAction)
+        # add other required actions
+        self.menu.popup(QCursor.pos())
+        print("HER")
+
+    def renameSlot(self, event):
+        print("renaming slot called", event)
+        # get the selected row and column
+        row = self.liste.rowAt(event.pos().y())
+        col = self.liste.columnAt(event.pos().x())
+        print(col,row)
+        # get the selected cell
+        #cell = self.liste.item(row, col)
+        # get the text inside selected cell (if any)
+        #cellText = cell.text()
+        # get the widget inside selected cell (if any)
+        #widget = self.liste.cellWidget(row, col)
+
 
 class MessageHandler(QThread):
     over = Signal(object)
@@ -117,9 +119,7 @@ class MessageHandler(QThread):
 
     def __init__(self, config, section, _queue):
         super().__init__()
-        #Process.__init__(self)
         self._config = config
-        #self._section = section
         self._queue = _queue
 
         try:
@@ -137,25 +137,25 @@ class MessageHandler(QThread):
             # Check queue for new messages
             msg = None
             try:
-                print("Message Handler")
+                #print("Message Handler")
                 msg = self._queue.get(True, 1)
-                print("HER:",msg)
+                #print("HER:",msg)
             except KeyboardInterrupt:
                 self.stop()
                 continue
             except Empty:
                 continue
 
-            _msg = msg['msg']
-            #if self.providing_server and self.providing_server not in _msg.host:
-            #    continue
+            try:
+                _msg = msg['msg']
+            except TypeError:
+                break
 
-            print(str(_msg))
+            #print(str(_msg))
             self.over.emit(_msg)
 
     def stop(self):
         """Stop MessageHandler."""
-        #self.logger.info("Stopping MessageHandler.")
         print("Stopping MessageHandler.")
         self._loop = False
 
@@ -163,6 +163,11 @@ class MessageHandler(QThread):
         """Process message"""
         return
 
+    @Slot(object)
+    def receive_quit(self):
+        self.stop()
+
+        
 class FileListener(threading.Thread):
 
     def __init__(self, queue, config, command_name):
@@ -181,6 +186,10 @@ class FileListener(threading.Thread):
         self.loop = False
         self.queue.put(None)
 
+    @Slot(object)
+    def receive_quit(self):
+        self.stop()
+
     def run(self):
         print("Entering run in FileListener ...")
         if type(self.config["subscribe-topic"]) not in (tuple, list, set):
@@ -196,7 +205,7 @@ class FileListener(threading.Thread):
                     if not self.loop:
                         # LOGGER.debug("Self.loop false in FileListener {}".format(self.loop))
                         break
-                    print("Message = " + str(msg))
+                    #print("Message = " + str(msg))
                     if msg is None:
                         continue 
                     if msg.type in ['beat', 'info']:
@@ -207,7 +216,7 @@ class FileListener(threading.Thread):
                     msg_data['msg'] = msg
                     msg_data['command_name'] = self.command_name
                     self.queue.put(msg_data)
-                    print("After queue put.")
+                    #print("After queue put.")
 
         except KeyError as ke:
             print("Some key error. probably in config:", ke)
@@ -215,39 +224,10 @@ class FileListener(threading.Thread):
         except KeyboardInterrupt:
             print("Received keyboard interrupt. Shutting down.")
             raise
-                   
-def write_to_queue(msg, meta, _queue):
-    #Write to queue
-    #print "WRITE TO QUEUE"
-    print("Before write", _queue.qsize())
-    #msg.data['db_database'] = meta['db_database']
-    #msg.data['db_passwd'] = meta['db_passwd']
-    #msg.data['db_user'] = meta['db_user']
-    #msg.data['db_host'] = meta['db_host']
-    _queue.put(msg)
-    print("After write", _queue.qsize())
 
         
 if __name__ == "__main__":
     app = QApplication([])
-
-    #_queue = Queue()
-
-    #queue_handler = Process(target=read_from_queue, args=(_queue,))
-    #queue_handler.daemon = True
-    #queue_handler.start()
-
-    #config = {'subscribe-topic': '/'}
-    #listener = FileListener(_queue, config, "command")
-    #listener.start()
-    
-    #config_item = 'section on old config stash'
-    #message_handler = MessageHandler(config, config_item, _queue)
-    #message_handler.daemon = True
-    #message_handler.set_logger(logger)
-    #message_handler.run()
-    #message_handler.start()
-
     
     window = mainWindow()
     window.create_menubar()
