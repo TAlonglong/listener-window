@@ -8,7 +8,7 @@ from posttroll.listener import ListenerContainer, Listener
 import posttroll
 
 from PySide2.QtWidgets import QApplication, QSizePolicy
-from PySide2.QtWidgets import (QAction, QAbstractItemView, qApp, QDataWidgetMapper, QHeaderView, QMainWindow, QMessageBox, QWidget, QGroupBox, QTableView, QVBoxLayout, QMenu, QAction)
+from PySide2.QtWidgets import (QAction, QAbstractItemView, qApp, QDataWidgetMapper, QHeaderView, QMainWindow, QMessageBox, QWidget, QGroupBox, QTableView, QVBoxLayout, QMenu)
 from PySide2.QtGui import QKeySequence, QStandardItemModel, QStandardItem, QColor, QCursor
 from PySide2.QtCore import QStringListModel, QObject, QThread, Signal, Slot
 
@@ -90,27 +90,38 @@ class mainWindow(QMainWindow):
 
     def contextMenuEvent(self, event):
         self.menu = QMenu(self)
-        self.renameAction = QAction('Rename', self)
-        self.renameAction.triggered.connect(self.renameSlot(event))
-        self.menu.addAction(self.renameAction)
+        self.resendAction = QAction('Resend', self)
+        self.menu.addAction(self.resendAction)
         # add other required actions
         self.menu.popup(QCursor.pos())
-        print("HER")
+        row = event.y()
+        self.resendAction.triggered.connect(lambda: self.resendSlot(row))
+        print("HER:", row)
 
-    def renameSlot(self, event):
-        print("renaming slot called", event)
+    @Slot()
+    def resendSlot(self, y):
+        #print("resend slot called", event)
         # get the selected row and column
-        row = self.liste.rowAt(event.pos().y())
-        col = self.liste.columnAt(event.pos().x())
-        print(col,row)
+        row = self.liste.rowAt(y)
+        #col = self.liste.columnAt(event.pos().x())
+        print(row)
         # get the selected cell
         #cell = self.liste.item(row, col)
         # get the text inside selected cell (if any)
         #cellText = cell.text()
         # get the widget inside selected cell (if any)
         #widget = self.liste.cellWidget(row, col)
+        print(self.model.item(row - 1, 0).text(),
+              self.model.item(row - 1, 1).text(),
+              self.model.item(row - 1, 2).text(),
+              self.model.item(row - 1, 3).text())
 
-
+    def closeEvent(self, event):
+        # If the close event is called (eg ALT+F4) we need to stop the
+        # message handler and the listener before quiting
+        self.message_handler.receive_quit()
+        self.listener.receive_quit()
+        
 class MessageHandler(QThread):
     over = Signal(object)
 
